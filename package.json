@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --check --ignore-path .gitignore ./src",
-    "format:fix": "prettier --write --ignore-path .gitignore ./src"
+    "format:fix": "prettier --write --ignore-path .gitignore ./src",
+    "seed": "tsx db/seeder.ts"
   },
   "dependencies": {
     "@heroicons/react": "^2.1.5",
