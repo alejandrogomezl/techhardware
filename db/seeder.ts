@@ -1,3 +1,4 @@
+import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import mongoose from 'mongoose';
 import Products, { Product } from '../src/models/Product';
@@ -48,29 +49,48 @@ async function seed() {
   const insertedProducts = await Products.insertMany(products);
   console.log('Inserted products:', JSON.stringify(insertedProducts, null, 2));
 
-  // Insert a sample user
-  const user: User = {
-    email: 'johndoe@example.com',
-    password: '1234',
-    name: 'John',
-    surname: 'Doe',
-    address: '123 Main St, 12345 New York, United States',
-    birthdate: new Date('1970-01-01'),
-    cartItems: [
-      {
-        product: insertedProducts[0]._id,
-        qty: 2,
-      },
-      {
-        product: insertedProducts[1]._id,
-        qty: 5,
-      },
-    ],
-    orders: [],
-  };
+  // Insert sample users with hashed passwords
+  const SALT_ROUNDS = 10;
 
-  const insertedUser = await Users.create(user);
-  console.log('Inserted user:', JSON.stringify(insertedUser, null, 2));
+  const users: User[] = [
+    {
+      email: 'johndoe@example.com',
+      password: await bcrypt.hash('1234', SALT_ROUNDS),
+      name: 'John',
+      surname: 'Doe',
+      address: '123 Main St, 12345 New York, United States',
+      birthdate: new Date('1970-01-01'),
+      cartItems: [
+        {
+          product: insertedProducts[0]._id,
+          qty: 2,
+        },
+        {
+          product: insertedProducts[1]._id,
+          qty: 5,
+        },
+      ],
+      orders: [],
+    },
+    {
+      email: 'janedoe@example.com',
+      password: await bcrypt.hash('abcd', SALT_ROUNDS),
+      name: 'Jane',
+      surname: 'Doe',
+      address: '456 Elm St, 67890 Los Angeles, United States',
+      birthdate: new Date('1990-06-15'),
+      cartItems: [
+        {
+          product: insertedProducts[0]._id,
+          qty: 1,
+        },
+      ],
+      orders: [],
+    },
+  ];
+
+  const insertedUsers = await Users.insertMany(users);
+  console.log('Inserted users:', JSON.stringify(insertedUsers, null, 2));
 
   await conn.disconnect();
 }

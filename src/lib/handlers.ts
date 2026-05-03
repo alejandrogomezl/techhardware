@@ -3,6 +3,7 @@ import connect from '@/lib/mongoose';
 import Products, { Product } from '@/models/Product';
 import Users, { User } from '@/models/User';
 import Orders, { Order } from '@/models/Order';
+import bcrypt from 'bcrypt';
 
 // ─── Shared error response ────────────────────────────────────────────────────
 
@@ -59,8 +60,11 @@ export async function createUser(user: {
   const existing = await Users.find({ email: user.email });
   if (existing.length !== 0) return null;
 
+  const hash = await bcrypt.hash(user.password, 10);
+
   const doc: User = {
     ...user,
+    password: hash,
     birthdate: new Date(user.birthdate),
     cartItems: [],
     orders: [],
@@ -305,4 +309,27 @@ export async function getOrder(
   }>('orderItems.product', { __v: false });
 
   return order;
+}
+
+// ─── POST /api/auth/signin ────────────────────────────────────────────────────
+
+export interface CheckCredentialsResponse {
+  _id: Types.ObjectId;
+}
+
+export async function checkCredentials(
+  email: string,
+  password: string
+): Promise<CheckCredentialsResponse | null> {
+  await connect();
+
+  const user = await Users.findOne({ email });
+
+  if (!user) return null;
+
+  const match = await bcrypt.compare(password, user.password);
+
+  if (!match) return null;
+
+  return { _id: user._id };
 }

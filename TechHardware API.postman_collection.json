@@ -7,6 +7,141 @@
 	},
 	"item": [
 		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "POST /api/auth/signin — 200 credenciales válidas",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 200) {",
+									"    const body = pm.response.json();",
+									"    pm.collectionVariables.set('userId', body._id);",
+									"    console.log('userId guardado:', body._id);",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"johndoe@example.com\",\n  \"password\": \"1234\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/auth/signin",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"auth",
+								"signin"
+							]
+						},
+						"description": "Autentica al usuario y crea la cookie de sesión.\n\n**Test script:** guarda automáticamente el `_id` devuelto en la variable de colección `userId`."
+					},
+					"response": []
+				},
+				{
+					"name": "POST /api/auth/signin — 400 parámetros incompletos",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"johndoe@example.com\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/auth/signin",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"auth",
+								"signin"
+							]
+						},
+						"description": "Falta el campo `password` → 400 WRONG_PARAMS."
+					},
+					"response": []
+				},
+				{
+					"name": "POST /api/auth/signin — 401 credenciales erróneas",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"email\": \"johndoe@example.com\",\n  \"password\": \"wrong\"\n}"
+						},
+						"url": {
+							"raw": "http://localhost:3000/api/auth/signin",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"auth",
+								"signin"
+							]
+						},
+						"description": "Contraseña incorrecta → 401 WRONG_CREDENTIALS."
+					},
+					"response": []
+				},
+				{
+					"name": "POST /api/auth/signout — 204",
+					"request": {
+						"method": "POST",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/auth/signout",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"auth",
+								"signout"
+							]
+						},
+						"description": "Elimina la cookie de sesión. Responde 204 No Content."
+					},
+					"response": []
+				}
+			]
+		},
+		{
 			"name": "Products",
 			"item": [
 				{
@@ -164,7 +299,21 @@
 					"response": []
 				},
 				{
-					"name": "GET /api/users/:userId",
+					"name": "GET /api/users/:userId — 401 sin sesión",
+					"event": [
+						{
+							"listen": "prerequest",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"// Borra la cookie de sesión para forzar el 401",
+									"pm.cookies.jar().clear('localhost', function(err) {",
+									"    if (err) console.warn('No se pudo limpiar cookies:', err);",
+									"});"
+								]
+							}
+						}
+					],
 					"request": {
 						"method": "GET",
 						"header": [],
@@ -180,7 +329,52 @@
 								"users",
 								"{{userId}}"
 							]
-						}
+						},
+						"description": "Sin cookie de sesión → 401 NOT_AUTHENTICATED.\n\nEl pre-request script limpia la cookie `session` antes de enviar la petición."
+					},
+					"response": []
+				},
+				{
+					"name": "GET /api/users/:userId — 200 sesión propia",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/users/{{userId}}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"users",
+								"{{userId}}"
+							]
+						},
+						"description": "Con sesión activa y el mismo userId → 200 OK.\n\nEjecuta primero `POST /api/auth/signin` para que Postman tenga la cookie."
+					},
+					"response": []
+				},
+				{
+					"name": "GET /api/users/:userId — 403 otro usuario",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "http://localhost:3000/api/users/{{otherUserId}}",
+							"protocol": "http",
+							"host": [
+								"localhost"
+							],
+							"port": "3000",
+							"path": [
+								"api",
+								"users",
+								"{{otherUserId}}"
+							]
+						},
+						"description": "Con sesión activa pero userId distinto al de la sesión → 403 NOT_AUTHORIZED.\n\nEstablece `otherUserId` en las variables de colección con el `_id` de otro usuario."
 					},
 					"response": []
 				},
@@ -484,7 +678,6 @@
 			"script": {
 				"type": "text/javascript",
 				"packages": {},
-				"requests": {},
 				"exec": [
 					""
 				]
@@ -495,7 +688,6 @@
 			"script": {
 				"type": "text/javascript",
 				"packages": {},
-				"requests": {},
 				"exec": [
 					""
 				]
@@ -505,7 +697,13 @@
 	"variable": [
 		{
 			"key": "userId",
-			"value": "REPLACE_WITH_USER_ID"
+			"value": "REPLACE_WITH_USER_ID",
+			"description": "Se rellena automáticamente al ejecutar POST /api/auth/signin"
+		},
+		{
+			"key": "otherUserId",
+			"value": "REPLACE_WITH_OTHER_USER_ID",
+			"description": "ID de un usuario diferente al logueado, para probar el 403"
 		},
 		{
 			"key": "productId",

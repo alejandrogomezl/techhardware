@@ -1,34 +1,83 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getUserOrders, createOrder, getUser } from '@/lib/handlers';
+import { getUserOrders, createOrder, getUser, ErrorResponse, GetUserOrdersResponse, CreateOrderResponse } from '@/lib/handlers';
 import { Types } from 'mongoose';
+import { getSession } from '@/lib/auth';
 
 export async function GET(
   _request: NextRequest,
   { params }: { params: { userId: string } }
-) {
+): Promise<NextResponse<GetUserOrdersResponse> | NextResponse<ErrorResponse>> {
+  // 1. Authentication
+  const session = await getSession();
+  if (!session?.userId) {
+    return NextResponse.json(
+      { error: 'NOT_AUTHENTICATED', message: 'Authentication required.' },
+      { status: 401 }
+    );
+  }
+
+  // 2. Validate param
   if (!Types.ObjectId.isValid(params.userId)) {
-    return NextResponse.json({ error: 'Invalid user ID.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'WRONG_PARAMS', message: 'Invalid user ID.' },
+      { status: 400 }
+    );
+  }
+
+  // 3. Authorization
+  if (session.userId.toString() !== params.userId) {
+    return NextResponse.json(
+      { error: 'NOT_AUTHORIZED', message: 'Unauthorized access.' },
+      { status: 403 }
+    );
   }
 
   try {
     const orders = await getUserOrders(params.userId);
 
     if (!orders) {
-      return NextResponse.json({ error: 'User not found.' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'NOT_FOUND', message: 'User not found.' },
+        { status: 404 }
+      );
     }
 
     return NextResponse.json(orders, { status: 200 });
-  } catch (error) {
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+  } catch {
+    return NextResponse.json(
+      { error: 'SERVER_ERROR', message: 'Internal server error.' },
+      { status: 500 }
+    );
   }
 }
 
 export async function POST(
   request: NextRequest,
   { params }: { params: { userId: string } }
-) {
+): Promise<NextResponse<CreateOrderResponse> | NextResponse<ErrorResponse>> {
+  // 1. Authentication
+  const session = await getSession();
+  if (!session?.userId) {
+    return NextResponse.json(
+      { error: 'NOT_AUTHENTICATED', message: 'Authentication required.' },
+      { status: 401 }
+    );
+  }
+
+  // 2. Validate param
   if (!Types.ObjectId.isValid(params.userId)) {
-    return NextResponse.json({ error: 'Invalid user ID.' }, { status: 400 });
+    return NextResponse.json(
+      { error: 'WRONG_PARAMS', message: 'Invalid user ID.' },
+      { status: 400 }
+    );
+  }
+
+  // 3. Authorization
+  if (session.userId.toString() !== params.userId) {
+    return NextResponse.json(
+      { error: 'NOT_AUTHORIZED', message: 'Unauthorized access.' },
+      { status: 403 }
+    );
   }
 
   try {
@@ -36,14 +85,17 @@ export async function POST(
 
     if (!body.address || !body.cardHolder || !body.cardNumber) {
       return NextResponse.json(
-        { error: 'Invalid or incomplete request.' },
+        { error: 'WRONG_PARAMS', message: 'Invalid or incomplete request.' },
         { status: 400 }
       );
     }
 
     const user = await getUser(params.userId);
     if (!user) {
-      return NextResponse.json({ error: 'User not found.' }, { status: 404 });
+      return NextResponse.json(
+        { error: 'NOT_FOUND', message: 'User not found.' },
+        { status: 404 }
+      );
     }
 
     const res = await createOrder(
@@ -55,7 +107,7 @@ export async function POST(
 
     if (!res) {
       return NextResponse.json(
-        { error: 'Cart is empty or invalid request.' },
+        { error: 'BAD_REQUEST', message: 'Cart is empty or invalid request.' },
         { status: 400 }
       );
     }
@@ -66,9 +118,9 @@ export async function POST(
         Location: `/api/users/${params.userId}/orders/${res._id}`,
       },
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
-      { error: 'Invalid request body or server error.' },
+      { error: 'BAD_REQUEST', message: 'Invalid request body or server error.' },
       { status: 400 }
     );
   }

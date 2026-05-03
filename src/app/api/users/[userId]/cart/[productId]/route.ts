@@ -1,18 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { putUserCart, deleteUserCart } from '@/lib/handlers';
+import { putUserCart, deleteUserCart, ErrorResponse, PutUserCartResponse, DeleteUserCartResponse } from '@/lib/handlers';
 import { Types } from 'mongoose';
+import { getSession } from '@/lib/auth';
 
 export async function PUT(
   request: NextRequest,
   { params }: { params: { userId: string; productId: string } }
-) {
+): Promise<NextResponse<PutUserCartResponse> | NextResponse<ErrorResponse>> {
+  // 1. Authentication
+  const session = await getSession();
+  if (!session?.userId) {
+    return NextResponse.json(
+      { error: 'NOT_AUTHENTICATED', message: 'Authentication required.' },
+      { status: 401 }
+    );
+  }
+
+  // 2. Validate params
   if (
     !Types.ObjectId.isValid(params.userId) ||
     !Types.ObjectId.isValid(params.productId)
   ) {
     return NextResponse.json(
-      { error: 'Invalid user ID or invalid product ID.' },
+      { error: 'WRONG_PARAMS', message: 'Invalid user ID or invalid product ID.' },
       { status: 400 }
+    );
+  }
+
+  // 3. Authorization
+  if (session.userId.toString() !== params.userId) {
+    return NextResponse.json(
+      { error: 'NOT_AUTHORIZED', message: 'Unauthorized access.' },
+      { status: 403 }
     );
   }
 
@@ -21,7 +40,7 @@ export async function PUT(
 
     if (body.qty === undefined || body.qty <= 0) {
       return NextResponse.json(
-        { error: 'Number of items not greater than 0.' },
+        { error: 'WRONG_PARAMS', message: 'Number of items not greater than 0.' },
         { status: 400 }
       );
     }
@@ -30,7 +49,7 @@ export async function PUT(
 
     if (!res) {
       return NextResponse.json(
-        { error: 'User not found or product not found.' },
+        { error: 'NOT_FOUND', message: 'User not found or product not found.' },
         { status: 404 }
       );
     }
@@ -48,9 +67,9 @@ export async function PUT(
     }
 
     return NextResponse.json({ cartItems: res.cartItems }, { status: 200 });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
-      { error: 'Invalid request body or server error.' },
+      { error: 'BAD_REQUEST', message: 'Invalid request body or server error.' },
       { status: 400 }
     );
   }
@@ -59,14 +78,32 @@ export async function PUT(
 export async function DELETE(
   _request: NextRequest,
   { params }: { params: { userId: string; productId: string } }
-) {
+): Promise<NextResponse<DeleteUserCartResponse> | NextResponse<ErrorResponse>> {
+  // 1. Authentication
+  const session = await getSession();
+  if (!session?.userId) {
+    return NextResponse.json(
+      { error: 'NOT_AUTHENTICATED', message: 'Authentication required.' },
+      { status: 401 }
+    );
+  }
+
+  // 2. Validate params
   if (
     !Types.ObjectId.isValid(params.userId) ||
     !Types.ObjectId.isValid(params.productId)
   ) {
     return NextResponse.json(
-      { error: 'Invalid user ID or invalid product ID.' },
+      { error: 'WRONG_PARAMS', message: 'Invalid user ID or invalid product ID.' },
       { status: 400 }
+    );
+  }
+
+  // 3. Authorization
+  if (session.userId.toString() !== params.userId) {
+    return NextResponse.json(
+      { error: 'NOT_AUTHORIZED', message: 'Unauthorized access.' },
+      { status: 403 }
     );
   }
 
@@ -75,13 +112,16 @@ export async function DELETE(
 
     if (!res) {
       return NextResponse.json(
-        { error: 'User not found or product not found.' },
+        { error: 'NOT_FOUND', message: 'User not found or product not found.' },
         { status: 404 }
       );
     }
 
     return NextResponse.json({ cartItems: res.cartItems }, { status: 200 });
-  } catch (error) {
-    return NextResponse.json({ error: 'Server error.' }, { status: 500 });
+  } catch {
+    return NextResponse.json(
+      { error: 'SERVER_ERROR', message: 'Internal server error.' },
+      { status: 500 }
+    );
   }
 }
