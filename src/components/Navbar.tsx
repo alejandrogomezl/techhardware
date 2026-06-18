@@ -1,8 +1,6 @@
-import {
-  ArrowRightStartOnRectangleIcon,
-  UserIcon,
-} from '@heroicons/react/24/outline'
+import { UserIcon } from '@heroicons/react/24/outline'
 import NavbarButton from '@/components/NavbarButton'
+import NavbarSignOutButton from '@/components/NavbarSignOutButton'
 import CartIcon from '@/components/CartIcon'
 import Link from 'next/link'
 import { getSession } from '@/lib/auth'
@@ -38,13 +36,7 @@ export default async function Navbar() {
                   <span className='sr-only'>User profile</span>
                   <UserIcon className='h-6 w-6' aria-hidden='true' />
                 </NavbarButton>
-                <NavbarButton href='#'>
-                  <span className='sr-only'>Sign out</span>
-                  <ArrowRightStartOnRectangleIcon
-                    className='h-6 w-6'
-                    aria-hidden='true'
-                  />
-                </NavbarButton>
+                <NavbarSignOutButton />
               </>
             ) : (
               <>

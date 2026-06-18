@@ -1,11 +1,68 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { getGuestCart } from '@/lib/guestCart'
+import { getGuestCart, clearGuestCart } from '@/lib/guestCart'
 
-export default function CheckoutContent() {
-  const [items] = useState(() => getGuestCart())
+interface FormValues {
+  address: string
+  cardHolder: string
+  cardNumber: string
+}
+
+interface Props {
+  userId: string
+}
+
+export default function CheckoutContent({ userId }: Props) {
+  const router = useRouter()
+  const [error, setError] = useState('')
+  const [formValues, setFormValues] = useState<FormValues>({
+    address: '',
+    cardHolder: '',
+    cardNumber: '',
+  })
+
+  const items = getGuestCart()
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFormValues((prev) => ({ ...prev, [e.target.name]: e.target.value }))
+  }
+
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!event.currentTarget.checkValidity()) return
+
+    // 1. Sync localStorage cart → server cart
+    for (const item of items) {
+      const res = await fetch(`/api/users/${userId}/cart/${item.productId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ qty: item.qty }),
+      })
+      if (!res.ok) {
+        setError('Failed to sync cart. Please try again.')
+        return
+      }
+    }
+
+    // 2. Create order
+    const res = await fetch(`/api/users/${userId}/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(formValues),
+    })
+
+    if (res.ok) {
+      const data = await res.json()
+      clearGuestCart()
+      router.push(`/orders/${data._id}`)
+      router.refresh()
+    } else {
+      setError('An error occurred while processing your order. Please try again later.')
+    }
+  }
 
   const total = items.reduce((s, i) => s + i.price * i.qty, 0)
 
@@ -78,7 +135,7 @@ export default function CheckoutContent() {
         <h3 className='mb-4 text-lg font-semibold text-gray-900'>
           Payment details
         </h3>
-        <form className='space-y-4'>
+        <form className='group space-y-4' onSubmit={handleSubmit} noValidate>
           <div>
             <label
               htmlFor='address'
@@ -91,7 +148,10 @@ export default function CheckoutContent() {
               name='address'
               type='text'
               placeholder='123 Main St, 12345 City, Country'
-              className='mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500'
+              required
+              className='peer mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500'
+              value={formValues.address}
+              onChange={handleChange}
             />
           </div>
           <div>
@@ -106,7 +166,10 @@ export default function CheckoutContent() {
               name='cardHolder'
               type='text'
               placeholder='John Doe'
-              className='mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500'
+              required
+              className='peer mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500'
+              value={formValues.cardHolder}
+              onChange={handleChange}
             />
           </div>
           <div>
@@ -121,13 +184,26 @@ export default function CheckoutContent() {
               name='cardNumber'
               type='text'
               placeholder='0000 1111 2222 3333'
-              className='mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500'
+              required
+              pattern='\d{4}\s?\d{4}\s?\d{4}\s?\d{4}'
+              className='peer mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 invalid:[&:not(:placeholder-shown):not(:focus)]:border-red-500'
+              value={formValues.cardNumber}
+              onChange={handleChange}
             />
+            <p className='mt-1 hidden text-xs text-red-500 peer-[&:not(:placeholder-shown):not(:focus):invalid]:block'>
+              Enter a valid 16-digit card number.
+            </p>
           </div>
+
+          <div className={error ? '' : 'hidden'}>
+            <p className='rounded-md bg-red-50 px-3 py-2 text-sm text-red-700 ring-1 ring-red-200'>
+              {error}
+            </p>
+          </div>
+
           <button
             type='submit'
-            disabled
-            className='w-full rounded-md bg-indigo-600 px-6 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50'
+            className='w-full rounded-md bg-indigo-600 px-6 py-3 text-sm font-semibold text-white hover:bg-indigo-500 group-invalid:pointer-events-none group-invalid:opacity-50'
           >
             Confirm purchase
           </button>
